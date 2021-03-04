@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="bdfb4c92-95bb-4ecf-ba35-44e04af447ba" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="e772a2b7-fd49-438f-9ca1-d4c67a44730d" >
+		<db:oracle-connection host="localhost" user="system" password="system" instance="XE"/>
+	</db:config>
+	<flow name="assignmentFlow" doc:id="fd47811a-a53b-4cfd-a619-e8df5bb3b1ac" >
+		<http:listener doc:name="Listener" doc:id="2f01b2d6-3485-41cc-9305-802f966d75c0" config-ref="HTTP_Listener_config" path="/assign" allowedMethods="POST"/>
+		<set-variable value="#[payload.id]" doc:name="Set Variable" doc:id="394c02b3-2aad-4829-bb35-46eae4fef83f" variableName="vars"/>
+		<db:insert doc:name="Insert" doc:id="c0de274a-3db9-4d39-b4ac-7f9ca6629777" config-ref="Database_Config">
+			<db:sql ><![CDATA[INSERT INTO JOB_GRADES (GRADE,LOWEST_SAL,HIGHEST_SAL)
+VALUES (:GRADE,:LOWEST_SAL,:HIGHEST_SAL)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	GRADE: payload.id,
+	LOWEST_SAL: payload.low,
+	HIGHEST_SAL: payload.high
+}]]]></db:input-parameters>
+		</db:insert>
+		<logger level="INFO" doc:name="Logger" doc:id="b32898b7-77fd-486d-9e13-d4515e286579" message="#[payload]"/>
+		<db:select doc:name="Select" doc:id="1c3c9532-8063-42f3-ab83-215b504de710" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from job_grades where grade =:grade]]></db:sql>
+			<db:input-parameters ><![CDATA[#[grade: vars.vars]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="5c6720b9-31c3-4e80-b159-5036d9376eec" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
